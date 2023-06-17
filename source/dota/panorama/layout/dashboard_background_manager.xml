@@ -1,0 +1,109 @@
+<root>
+	<styles>
+		<include src="s2r://panorama/styles/dotastyles.vcss_c" />
+		<include src="s2r://panorama/styles/dashboard_background_manager.vcss_c" />
+	</styles>
+
+	<!--	ShowMMR dashboard mod by AveYo, 2023.06.05	-->
+	<scripts>
+		<include src="s2r://panorama/scripts/sequence_actions.vts_c" />
+	</scripts>
+	<script><![CDATA[
+		'use strict';
+		const core = $.GetContextPanel().GetParent(); // DashboardCore is the common ancestor with the profile page
+
+		function ShowMMR_Init(old_state, new_state) {
+			if (old_state !== 1 || new_state !== 3)
+            	return; // Dashboard-only ( dota_game_ui_state_loading_screen 1 -> dota_game_ui_state_dashboard 3 )
+
+			if (core.Data.show == null)
+            	core.Data.show = {};
+
+            if (core.Data.history == null) {
+				core.Data.history = {};
+				let history = CustomNetTables.GetAllTableValues('ShowMMR_history');
+				for (var i = 0; i < history.length; ++i)
+				{
+					let kv = history[i]['value'];
+ 					if (kv == null)
+						continue;
+					for (let [k, v] of Object.entries(kv)) {core.Data.history[+k] = [v['1'], v['2']];}
+				}
+			}
+
+			if (core.Data.cfg == null)
+            	core.Data.cfg = {};
+
+            if (core.Data.cfg.RankUpdated == true) {
+            	core.Data.cfg.RankUpdated = false;
+                ShowMMR_Refresh();
+            }
+
+			if (core.Data.mmr == null) {
+            	core.Data.mmr = ShowMMR_Refresh(); // -1;
+            }
+		}
+
+		function ShowMMR_Refresh() {
+			if (Game.GameStateIsAfter(0))
+				return; // Dashboard-only
+
+			/// MMR Number - must load the HeroStatsPage once to grab it
+			let pages = core.FindChildInLayoutFile('DashboardForeground').FindChildInLayoutFile('DashboardPages');
+			let stats = pages; let retries = 50; let nav = false;
+			let queue = new RunSequentialActions();
+			queue.actions.push( new WaitForConditionAction( function() {
+				if (stats.paneltype == 'DOTAProfileHeroStatsPage')
+					return true;
+				for ( let i = 0; i < pages.GetChildCount(); ++i ) {
+					let found = pages.GetChild(i);
+					if (found.paneltype == 'DOTAProfileHeroStatsPage')
+						stats = found;
+				}
+				if (stats.paneltype != 'DOTAProfileHeroStatsPage')
+					nav = true;
+				if (nav)
+					RunSingleAction(new DispatchEventAction('DOTAShowProfileHeroStatsPage', core));
+				return false;
+			}));
+			queue.actions.push( new WaitForConditionAction( function() {
+				core.Data.mmr =  -1;
+				if (stats.BHasClass('MMRCalibrated'))
+					core.Data.mmr = +($.Localize('#ranked_mmr_value', stats).replaceAll(/\D+/g, '')) || -1;
+				if (core.Data.mmr == -1)
+					--retries;
+				if (retries <= 0 || core.Data.mmr > -1) {
+					if (nav)
+						RunSingleAction(new DispatchEventAction('DOTANavigateBack', core));
+					return true;
+				}
+				return false;
+			}));
+			queue.actions.push( new RunFunctionAction( function() {
+				GameEvents.SendCustomGameEventToServer('ShowMMR_Refresh', {'mmr': core.Data.mmr});
+			}));
+			RunSingleAction(queue);
+		}
+
+		function ShowMMR_DOTARankUpdated() {
+			if (core.Data.cfg == null)
+            	core.Data.cfg = {};
+
+            core.Data.cfg.RankUpdated = true;
+        }
+
+		function ShowMMR_RecentDataUpdated(t, k, v) {
+			if (Game.GameStateIsAfter(0))
+				return; // Dashboard-only
+
+			core.Data.history[+k] = [v['1'], v['2']];
+		}
+
+		$.RegisterForUnhandledEvent("DOTAGameUIStateChanged", ShowMMR_Init)
+		$.RegisterForUnhandledEvent('DOTARankUpdated', ShowMMR_DOTARankUpdated);
+        CustomNetTables.SubscribeNetTableListener('ShowMMR_update', ShowMMR_RecentDataUpdated);
+	]]></script>
+
+	<DOTADashboardBackgroundManager />
+</root>
+

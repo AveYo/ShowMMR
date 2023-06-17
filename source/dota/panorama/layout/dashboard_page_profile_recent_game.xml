@@ -1,0 +1,80 @@
+<root>
+	<styles>
+		<include src="s2r://panorama/styles/dotastyles.vcss_c" />
+		<include src="s2r://panorama/styles/dashboard_page_shared.vcss_c" />
+		<include src="s2r://panorama/styles/dashboard_page_profile.vcss_c" />
+	</styles>
+
+	<!--	ShowMMR dashboard mod by AveYo, 2023.06.05	-->
+	<script><![CDATA[
+		'use strict';
+
+        function ShowMMR_Refresh() {
+			const core = $.GetContextPanel().FindAncestor('DashboardCore');
+			if (core.Data.history == null) {
+				$.Warning('ShowMMR_Refresh: missing core.Data.history!');
+				return;
+			}
+			const cfg = core.Data.cfg, history = core.Data.history, show = core.Data.show, self = $.GetContextPanel();
+
+			cfg._ranked = cfg._ranked || $.Localize('#DOTA_lobby_type_name_ranked');
+			if ($('#GameType').text != cfg._ranked)
+				return; /// ranked only
+
+			let epoch = 0, stampdate = $('#TimestampDate').text;
+			let stamp = 'E' + (stampdate + $('#TimestampTime').text + $('#Duration').text).replace(/\D/g,'');
+			let found = show[stamp];
+
+			/// Match epoch - idk how to get unlocalized dialogvariabletime value, so derive 4 UTC dates and compare
+			if (!found) {
+				let gmt = $.Localize('{T:d:timestamp}', self), dst = $.Localize('{T:timestamp}', self);
+				let hms = gmt.match(/\d+/g), hour = parseInt(hms[0]), minute = parseInt(hms[1]), second = parseInt(hms[2]);
+				if (hms.length < 3) {
+					second = minute; minute = hour; hour = 0;
+				}
+				let ymd = stampdate.match(/\d+/g), year = parseInt(ymd[0]), month = parseInt(ymd[1]), day = parseInt(ymd[2]);
+				if (year < 32) {
+					let flip = day; day = year; year = flip;
+				}
+				let utc0 = Date.UTC(year, month - 1, day, hour, minute, second, 0) / 1000,  utc1 = utc0 - 86400;
+				let utc2 = Date.UTC(year, day - 1, month, hour, minute, second, 0) / 1000,  utc3 = utc2 + 86400;
+				self.SetDialogVariableTime('utc0', utc0); self.SetDialogVariableTime('utc1', utc1);
+				self.SetDialogVariableTime('utc2', utc2); self.SetDialogVariableTime('utc3', utc3);
+				let utc = $.Localize('{T:utc0}|{T:utc1}|{T:utc2}|{T:utc3}', self).split('|');
+				epoch = (utc[0] == dst) ? utc0 : (utc[1] == dst) ? utc1 : (utc[2] == dst) ? utc2 : (utc[3] == dst) ? utc3 : 0;
+			} else { epoch = found.epoch; }
+
+			if (!found) {
+				let e = history[epoch], mmr = e ? e[0] : -1, shift = e ? e[1] : -1;
+				show[stamp] = {label: '', epoch: epoch, mmr: mmr, shift: shift};
+				found = show[stamp];
+			}
+
+			let numbers;
+			if (found.mmr == -1 && found.shift == -1) {
+				numbers = '';
+			} else if (found.mmr == 0 && found.shift == 0) {
+				cfg._uncalibrated = cfg._uncalibrated || $.Localize('#dota_profile_recent_game_result_uncalibrated_ranked');
+				numbers = cfg._uncalibrated;
+			} else if ($.GetContextPanel().BHasClass('Abandoned')) {
+				cfg._abandon = cfg._abandon || $.Localize('#dota_profile_recent_game_result_abandon');
+				numbers = cfg._abandon + ' (' + found.shift + ')';
+			} else {
+				self.SetDialogVariableInt('showmmr', found.mmr);
+				numbers = $.Localize('{i:showmmr}', self) + ((found.shift > 0) ? ' (+' : ' (') + found.shift + ')';
+			}
+			if (numbers != '') { $('#Result').text = numbers; found.label = numbers; }
+		}
+	]]></script>
+
+	<Panel class="RecentGame" onload="ShowMMR_Refresh()">
+		<Label class="TimestampDate" text="{T:s:timestamp}" id="TimestampDate" />
+		<Label class="TimestampTime" text="{T:t:timestamp}" id="TimestampTime" />
+		<DOTAHeroImage id="HeroIcon" heroimagestyle="landscape" scaling="stretch-to-fit-preserve-aspect" />
+		<Label class="HeroName" text="{s:hero_name}" />
+		<Label class="Result" text="{s:result}" id="Result" />
+		<Label class="Duration" text="{T:d:duration}" id= "Duration" />
+		<Label class="GameType" text="{s:game_type}" id="GameType" />
+	</Panel>
+</root>
+
