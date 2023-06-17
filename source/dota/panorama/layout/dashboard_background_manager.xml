@@ -40,7 +40,8 @@
             }
 
 			if (core.Data.mmr == null) {
-            	core.Data.mmr = ShowMMR_Refresh(); // -1;
+            	core.Data.mmr = -1;
+                ShowMMR_Refresh();
             }
 		}
 
@@ -90,12 +91,10 @@
             	core.Data.cfg = {};
 
             core.Data.cfg.RankUpdated = true;
+            ShowMMR_Refresh();
         }
 
 		function ShowMMR_RecentDataUpdated(t, k, v) {
-			if (Game.GameStateIsAfter(0))
-				return; // Dashboard-only
-
 			core.Data.history[+k] = [v['1'], v['2']];
 		}
 

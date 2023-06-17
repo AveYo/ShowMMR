@@ -89,8 +89,8 @@ function ShowMMR:Save(e)
 	local rank_1 = self.mmr or -1
 	local serialize = false
 
-	-- add mmr and change numbers for the 1st recent game if applicable
-	if time_1 ~= nil and rank_1 > 0 and (find_1 == nil or find_1[1] == 0) then
+    -- add mmr and change numbers for the 1st recent game if applicable
+	if time_1 ~= nil and rank_1 > 0 and (find_1 == nil or find_1[1] == 0 or find_1[2] == 0) then
 		local change, t = 0, tonumber(time_1)
 		if find_2 ~= nil and find_2[1] > 0 then change = rank_1 - find_2[1] end
 		vlua.tableadd(self.data, {[t] = {rank_1, change}})
