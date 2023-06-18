@@ -50,32 +50,26 @@
 				return; // Dashboard-only
 
 			/// MMR Number - must load the HeroStatsPage once to grab it
-			let pages = core.FindChildInLayoutFile('DashboardForeground').FindChildInLayoutFile('DashboardPages');
-			let stats = pages; let retries = 50; let nav = false;
+			let stats = core; let retries = 50; // let nav = true; /// change: always nav to force a refresh
+			RunSingleAction(new DispatchEventAction('DOTAShowProfileHeroStatsPage', core));
 			let queue = new RunSequentialActions();
 			queue.actions.push( new WaitForConditionAction( function() {
-				if (stats.paneltype == 'DOTAProfileHeroStatsPage')
-					return true;
+				let pages = core.FindChild('DashboardForeground').FindChild('DashboardPages');
 				for ( let i = 0; i < pages.GetChildCount(); ++i ) {
 					let found = pages.GetChild(i);
 					if (found.paneltype == 'DOTAProfileHeroStatsPage')
 						stats = found;
 				}
-				if (stats.paneltype != 'DOTAProfileHeroStatsPage')
-					nav = true;
-				if (nav)
-					RunSingleAction(new DispatchEventAction('DOTAShowProfileHeroStatsPage', core));
-				return false;
+				return (stats.paneltype == 'DOTAProfileHeroStatsPage');
 			}));
 			queue.actions.push( new WaitForConditionAction( function() {
 				core.Data.mmr =  -1;
 				if (stats.BHasClass('MMRCalibrated'))
-					core.Data.mmr = +($.Localize('#ranked_mmr_value', stats).replaceAll(/\D+/g, '')) || -1;
+					core.Data.mmr = parseInt($.Localize('#ranked_mmr_value', stats).replaceAll(/\D+/g, '')) || -1;
 				if (core.Data.mmr == -1)
 					--retries;
 				if (retries <= 0 || core.Data.mmr > -1) {
-					if (nav)
-						RunSingleAction(new DispatchEventAction('DOTANavigateBack', core));
+					RunSingleAction(new DispatchEventAction('DOTANavigateBack', core));
 					return true;
 				}
 				return false;
@@ -99,8 +93,9 @@
 		}
 
 		$.RegisterForUnhandledEvent("DOTAGameUIStateChanged", ShowMMR_Init)
+		$.RegisterForUnhandledEvent('DOTAGameAccountClientUpdated', ShowMMR_DOTARankUpdated);
 		$.RegisterForUnhandledEvent('DOTARankUpdated', ShowMMR_DOTARankUpdated);
-        CustomNetTables.SubscribeNetTableListener('ShowMMR_update', ShowMMR_RecentDataUpdated);
+		CustomNetTables.SubscribeNetTableListener('ShowMMR_update', ShowMMR_RecentDataUpdated);
 	]]></script>
 
 	<DOTADashboardBackgroundManager />
