@@ -14,12 +14,12 @@
 
 		function ShowMMR_Init(old_state, new_state) {
 			if (old_state !== 1 || new_state !== 3)
-            	return; // Dashboard-only ( dota_game_ui_state_loading_screen 1 -> dota_game_ui_state_dashboard 3 )
+				return; // Dashboard-only ( dota_game_ui_state_loading_screen 1 -> dota_game_ui_state_dashboard 3 )
 
 			if (core.Data.show == null)
-            	core.Data.show = {};
+				core.Data.show = {};
 
-            if (core.Data.history == null) {
+			if (core.Data.history == null) {
 				core.Data.history = {};
 				let history = CustomNetTables.GetAllTableValues('ShowMMR_history');
 				for (var i = 0; i < history.length; ++i)
@@ -32,17 +32,17 @@
 			}
 
 			if (core.Data.cfg == null)
-            	core.Data.cfg = {};
+				core.Data.cfg = {};
 
-            if (core.Data.cfg.RankUpdated == true) {
-            	core.Data.cfg.RankUpdated = false;
-                ShowMMR_Refresh();
-            }
+			if (core.Data.cfg.RankUpdated == true) {
+				core.Data.cfg.RankUpdated = false;
+				ShowMMR_Refresh();
+			}
 
 			if (core.Data.mmr == null) {
-            	core.Data.mmr = -1;
-                ShowMMR_Refresh();
-            }
+				core.Data.mmr = -1;
+				ShowMMR_Refresh();
+			}
 		}
 
 		function ShowMMR_Refresh() {
@@ -88,11 +88,11 @@
 
 		function ShowMMR_DOTARankUpdated() {
 			if (core.Data.cfg == null)
-            	core.Data.cfg = {};
+				core.Data.cfg = {};
 
-            core.Data.cfg.RankUpdated = true;
-            ShowMMR_Refresh();
-        }
+			core.Data.cfg.RankUpdated = true;
+			ShowMMR_Refresh();
+		}
 
 		function ShowMMR_RecentDataUpdated(t, k, v) {
 			core.Data.history[+k] = [v['1'], v['2']];

@@ -9,9 +9,6 @@ where %release% /Q || (echo Use dotnet_build script first & timeout /t -1 >nul &
 
 if not defined output timeout /t -1 & exit /b
 pushd "%~dp0" & for /f "delims=" %%A in ('dir %output% /a:-D/b/oD') do set "file=%%~A"
-echo;
-echo Press any key to also install: %file% or Alt+F4 to exit...
-timeout /t -1 >nul
 
 ::# detect STEAM path
 for /f "tokens=2*" %%R in ('reg query HKCU\SOFTWARE\Valve\Steam /v SteamPath 2^>nul') do set "steam_reg=%%S" & set "libfs="
@@ -22,6 +19,13 @@ for /f usebackq^ delims^=^"^ tokens^=4 %%s in (`findstr /c:":\\" "%STEAM%\steama
  if exist "%%s\steamapps\appmanifest_570.acf" if exist "%%s\steamapps\common\dota 2 beta\game\core\pak01_dir.vpk" set "libfs=%%s")
 if defined libfs set "STEAMAPPS=%libfs:\\=\%\steamapps"
 set "DOTA2=%STEAMAPPS%\common\dota 2 beta"
+
+::# if DOTA2 not found, exit
+if not exist "%DOTA2%\game\dota\cfg\machine_convars.vcfg" timeout /t -1 & exit /b
+echo;
+echo DOTA2 cfg found at %DOTA2%\game\cfg
+echo Press any key to also install: %file% or Alt+F4 to exit...
+timeout /t -1 >nul
 
 ::# install the generated file
 copy /y %file% "%dota2%\game\dota\cfg\"

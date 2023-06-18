@@ -9,7 +9,7 @@
 	<script><![CDATA[
 		'use strict';
 
-        function ShowMMR_Refresh() {
+		function ShowMMR_Refresh() {
 			const core = $.GetContextPanel().FindAncestor('DashboardCore');
 			if (core.Data.history == null) {
 				$.Warning('ShowMMR_Refresh: missing core.Data.history!');
