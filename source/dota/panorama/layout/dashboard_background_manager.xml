@@ -49,8 +49,16 @@
 			if (Game.GameStateIsAfter(0))
 				return; // Dashboard-only
 
+			if (core.Data.cfg == null)
+				core.Data.cfg = {};
+
+			if (core.Data.cfg.Refreshing === true)
+				return; /// ignore other requests while running
+
+			core.Data.cfg.Refreshing = true;
+
 			/// MMR Number - must load the HeroStatsPage once to grab it
-			let stats = core; let retries = 50; // let nav = true; /// change: always nav to force a refresh
+			let stats = core; let retries = 100; // let nav = true; /// change: always nav once to force a refresh
 			RunSingleAction(new DispatchEventAction('DOTAShowProfileHeroStatsPage', core));
 			let queue = new RunSequentialActions();
 			queue.actions.push( new WaitForConditionAction( function() {
@@ -75,6 +83,7 @@
 				return false;
 			}));
 			queue.actions.push( new RunFunctionAction( function() {
+				core.Data.cfg.Refreshing = false;
 				GameEvents.SendCustomGameEventToServer('ShowMMR_Refresh', {'mmr': core.Data.mmr});
 			}));
 			RunSingleAction(queue);
@@ -93,7 +102,6 @@
 		}
 
 		$.RegisterForUnhandledEvent("DOTAGameUIStateChanged", ShowMMR_Init)
-		$.RegisterForUnhandledEvent('DOTAGameAccountClientUpdated', ShowMMR_DOTARankUpdated);
 		$.RegisterForUnhandledEvent('DOTARankUpdated', ShowMMR_DOTARankUpdated);
 		CustomNetTables.SubscribeNetTableListener('ShowMMR_update', ShowMMR_RecentDataUpdated);
 	]]></script>
