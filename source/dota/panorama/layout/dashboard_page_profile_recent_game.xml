@@ -25,9 +25,9 @@
 			let stamp = 'E' + (stampdate + $('#TimestampTime').text + $('#Duration').text).replace(/\D/g,'');
 			let found = show[stamp];
 
-			/// Match epoch - idk how to get unlocalized dialogvariabletime value, so derive 4 UTC dates and compare
+			/// Match epoch - idk how to get unlocalized dialogvariabletime value, so derive 6 UTC dates and compare
 			if (!found) {
-				let gmt = $.Localize('{T:d:timestamp}', self), dst = $.Localize('{T:timestamp}', self);
+				let gmt = $.Localize('{T:d:timestamp}', self), dst = $.Localize('{T:timestamp}', self), utc = [];
 				let hms = gmt.match(/\d+/g), hour = parseInt(hms[0]), minute = parseInt(hms[1]), second = parseInt(hms[2]);
 				if (hms.length < 3) {
 					second = minute; minute = hour; hour = 0;
@@ -36,12 +36,12 @@
 				if (year < 32) {
 					let flip = day; day = year; year = flip;
 				}
-				let utc0 = Date.UTC(year, month - 1, day, hour, minute, second, 0) / 1000,  utc1 = utc0 - 86400;
-				let utc2 = Date.UTC(year, day - 1, month, hour, minute, second, 0) / 1000,  utc3 = utc2 + 86400;
-				self.SetDialogVariableTime('utc0', utc0); self.SetDialogVariableTime('utc1', utc1);
-				self.SetDialogVariableTime('utc2', utc2); self.SetDialogVariableTime('utc3', utc3);
-				let utc = $.Localize('{T:utc0}|{T:utc1}|{T:utc2}|{T:utc3}', self).split('|');
-				epoch = (utc[0] == dst) ? utc0 : (utc[1] == dst) ? utc1 : (utc[2] == dst) ? utc2 : (utc[3] == dst) ? utc3 : 0;
+				utc[0] = Date.UTC(year, month - 1, day, hour, minute, second, 0) / 1000; /// OK: day/month/year
+				utc[1] = Date.UTC(year, day - 1, month, hour, minute, second, 0) / 1000; /// US: month/day/year
+				utc[2] = utc[0] - 86400; utc[3] = utc[0] + 86400; utc[4] = utc[1] - 86400; utc[5] = utc[1] + 86400; /// +/- 1 day
+				utc.forEach(function(x,i,a){ self.SetDialogVariableTime('utc' + i, x); });
+				let localized = $.Localize('{T:utc0}|{T:utc1}|{T:utc2}|{T:utc3}|{T:utc4}|{T:utc5}', self).split('|');
+				localized.forEach(function(x,i,a){ if (x == dst) epoch = utc[i]; });
 			} else { epoch = found.epoch; }
 
 			if (!found) {
