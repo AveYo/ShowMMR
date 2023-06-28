@@ -1,4 +1,4 @@
-/* 2>nul || @title DOTA MOD BUILDER by AveYo v9
+/* 2>nul || @title DOTA MOD BUILDER by AveYo v9.1
 
 @set "OVERRIDE_STEAM_PATH_IF_NEEDED="
 @set "OVERRIDE_DOTA2_PATH_IF_NEEDED="
@@ -53,6 +53,7 @@ pushd "%RELEASE%\working"
 for /f "delims=" %%A in ('dir /a:-D/b/s') do for /f "delims=." %%Z in ('echo %%~xA') do (
  if exist "%%~fA_c" ( del /f/q "%%~A" ) else if exist "%%~dpnA.v%%Z_c" del /f/q "%%~A"
 )
+del /f/s/q *.png *.psd >nul 2>nul
 pushd "%~dp0"
 
 echo ValvePak-ing working folder to RELEASE

@@ -106,6 +106,6 @@
 		CustomNetTables.SubscribeNetTableListener('ShowMMR_update', ShowMMR_RecentDataUpdated);
 	]]></script>
 
-	<DOTADashboardBackgroundManager />
+	<DOTADashboardBackgroundManager override-background="s2r://panorama/layout/dashboard_background_bali_major_2023.vxml_c" />
 </root>
 
