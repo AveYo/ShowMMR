@@ -5,7 +5,7 @@
 		<include src="s2r://panorama/styles/dashboard_page_profile.vcss_c" />
 	</styles>
 
-	<!--	ShowMMR dashboard mod by AveYo, 2023.06.05	-->
+	<!--	ShowMMR dashboard mod by AveYo, 2023.07.23	-->
 	<script><![CDATA[
 		'use strict';
 
@@ -17,7 +17,7 @@
 			}
 			const cfg = core.Data.cfg, history = core.Data.history, show = core.Data.show, self = $.GetContextPanel();
 
-			cfg._ranked = cfg._ranked || $.Localize('#DOTA_lobby_type_name_ranked');
+			cfg._ranked = cfg._ranked || $.Localize('#dota_lobby_type_competitive');
 			if ($('#GameType').text != cfg._ranked)
 				return; /// ranked only
 

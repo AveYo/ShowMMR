@@ -1,4 +1,4 @@
---	ShowMMR dashboard mod by AveYo, 2023.06.05	--
+--	ShowMMR dashboard mod by AveYo, 2023.07.23	--
 
 if not IsServer() then return end -- local lua server instance only
 
@@ -70,23 +70,20 @@ function ShowMMR:Init(e)
 end
 
 function ShowMMR:Refresh(i, e)
-	if GameRules then return end -- dashboard only
-
 	-- e event received from panorama dashboard_background_manager
-	self.mmr = tonumber(e.mmr) or 0
+	self.mmr = tonumber(e.mmr) or -1
 
 	-- grab recent_game_time.. values from console into self.cfg table, then signal Save function via round_start event
 	SendToServerConsole('dota_game_account_client_debug | cfg; echo "cfg_updated: 1" | cfg;')
 end
 
 function ShowMMR:Save(e)
-	if GameRules then return end -- dashboard only
 	if type(e) ~= 'table' or e.round_name ~= 'cfg_updated' then return end -- local cfg_updated event only
 
 	-- search the local mmr table for recent_game_time.. values grabbed from console
 	local time_1, time_2, time_3 = self.cfg.recent_game_time_1, self.cfg.recent_game_time_2, self.cfg.recent_game_time_3
 	local find_1, find_2, find_3 = self.history[tonumber(time_1)], self.history[tonumber(time_2)], self.history[tonumber(time_3)]
-	local rank_1 = self.mmr or -1
+	local rank_1 = self.mmr or 0
 	local serialize = false
 
     -- add mmr and change numbers for the 1st recent game if applicable

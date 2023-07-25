@@ -4,17 +4,17 @@
 		<include src="s2r://panorama/styles/dashboard_background_manager.vcss_c" />
 	</styles>
 
-	<!--	ShowMMR dashboard mod by AveYo, 2023.06.05	-->
+	<!--	ShowMMR dashboard mod by AveYo, 2023.07.23	-->
 	<scripts>
 		<include src="s2r://panorama/scripts/sequence_actions.vts_c" />
 	</scripts>
 	<script><![CDATA[
 		'use strict';
-		const core = $.GetContextPanel().GetParent(); // DashboardCore is the common ancestor with the profile page
+		const core = $.GetContextPanel().GetParent(); /// DashboardCore is the common ancestor with the profile page
 
 		function ShowMMR_Init(old_state, new_state) {
 			if (old_state !== 1 || new_state !== 3)
-				return; // Dashboard-only ( dota_game_ui_state_loading_screen 1 -> dota_game_ui_state_dashboard 3 )
+				return; /// Dashboard-only ( dota_game_ui_state_loading_screen 1 -> dota_game_ui_state_dashboard 3 )
 
 			if (core.Data.show == null)
 				core.Data.show = {};
@@ -25,30 +25,23 @@
 				for (var i = 0; i < history.length; ++i)
 				{
 					let kv = history[i]['value'];
- 					if (kv == null)
+					if (kv == null)
 						continue;
-					for (let [k, v] of Object.entries(kv)) {core.Data.history[+k] = [v['1'], v['2']];}
+					for (let [k, v] of Object.entries(kv)) {core.Data.history[parseInt(k)] = [v['1'], v['2']];}
 				}
 			}
 
 			if (core.Data.cfg == null)
 				core.Data.cfg = {};
 
-			if (core.Data.cfg.RankUpdated == true) {
-				core.Data.cfg.RankUpdated = false;
-				ShowMMR_Refresh();
-			}
-
-			if (core.Data.mmr == null) {
+			if (core.Data.mmr == null || core.Data.mmr < 1 || core.Data.cfg.RankUpdated == true) {
 				core.Data.mmr = -1;
+				core.Data.cfg.RankUpdated = false;
 				ShowMMR_Refresh();
 			}
 		}
 
 		function ShowMMR_Refresh() {
-			if (Game.GameStateIsAfter(0))
-				return; // Dashboard-only
-
 			if (core.Data.cfg == null)
 				core.Data.cfg = {};
 
@@ -84,6 +77,8 @@
 			}));
 			queue.actions.push( new RunFunctionAction( function() {
 				core.Data.cfg.Refreshing = false;
+				if (Game.GameStateIsAfter(0))
+					return; /// forward event is Dashboard-only
 				GameEvents.SendCustomGameEventToServer('ShowMMR_Refresh', {'mmr': core.Data.mmr});
 			}));
 			RunSingleAction(queue);
@@ -94,18 +89,18 @@
 				core.Data.cfg = {};
 
 			core.Data.cfg.RankUpdated = true;
-			ShowMMR_Refresh();
+			//ShowMMR_Refresh();
 		}
 
 		function ShowMMR_RecentDataUpdated(t, k, v) {
-			core.Data.history[+k] = [v['1'], v['2']];
+			core.Data.history[parseInt(k)] = [v['1'], v['2']];
 		}
 
-		$.RegisterForUnhandledEvent("DOTAGameUIStateChanged", ShowMMR_Init)
+		$.RegisterForUnhandledEvent('DOTAGameUIStateChanged', ShowMMR_Init)
 		$.RegisterForUnhandledEvent('DOTARankUpdated', ShowMMR_DOTARankUpdated);
 		CustomNetTables.SubscribeNetTableListener('ShowMMR_update', ShowMMR_RecentDataUpdated);
 	]]></script>
 
-	<DOTADashboardBackgroundManager override-background="s2r://panorama/layout/dashboard_background_bali_major_2023.vxml_c" />
+	<DOTADashboardBackgroundManager override-background="s2r://panorama/layout/dashboard_background_default.vxml_c" />
 </root>
 
