@@ -155,15 +155,15 @@ set [=&for /f "delims=:" %%s in ('findstr /nbrc:":%~1:\[" /c:":%~1:\]" "%~f0"')d
         // and Valve have been less enthusiastic about hindering client-side modding in non-western world, wonder why
         SearchPaths
         {
+            // AveYo: here is a cleaner way to add mods, without messing the cfg/ path and other auto SearchPaths
+            Game_NonTools        dota_mods
+
             // These are optional language paths. They must be mounted first, which is why there are first in the list.
             // *LANGUAGE* will be replaced with the actual language name. Not mounted if not running a specific language.
             Game_Language        dota_*LANGUAGE*
 
             // These are optional low-violence paths. They will only get mounted if you are in a low-violence mode.
             Game_LowViolence     dota_lv
-
-            // AveYo: here is a cleaner way to add mods, without messing the cfg/ path and other auto SearchPaths
-            Game_NonTools        dota_mods
 
             Game                 dota
             Game                 core
