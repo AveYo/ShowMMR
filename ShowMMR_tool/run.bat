@@ -1,6 +1,6 @@
 @echo off
-pushd "%~dp0" & for %%J in (*.csproj) do set "release=%%~nJ.exe" & set "output=*.vcfg"
-set PATH=%PATH%;%CD%\bin\Release\net7.0;%CD%\bin\Release\net6.0;%CD%\bin\Release\net480
+pushd "%~dp0" & set "release=ShowMMR.exe" & set "output=*.vcfg"
+set PATH=%PATH%;%CD%\bin\Release\net7.0;%CD%\bin\Release\net6.0;%CD%\bin\Release\net48
 where %release% /Q || (echo Use dotnet_build script first & timeout /t -1 >nul & exit /b)
 
 
@@ -21,7 +21,7 @@ if defined libfs set "STEAMAPPS=%libfs:\\=\%\steamapps"
 set "DOTA2=%STEAMAPPS%\common\dota 2 beta"
 
 ::# if DOTA2 not found, exit
-if not exist "%DOTA2%\game\dota\cfg\machine_convars.vcfg" timeout /t -1 & exit /b
+if not exist "%DOTA2%\game\dota\cfg\machine_convars.vcfg" timeout /t 3 & exit /b
 echo;
 echo DOTA2 cfg found at %DOTA2%\game\cfg
 echo Press any key to also install: %file% or Alt+F4 to exit...

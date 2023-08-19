@@ -340,7 +340,7 @@ class Program
 		{
 			Thread.Sleep( 1000 );
 			var start_at_match_id = msg.Body.matches[msg.Body.matches.Count -1].match_id;
-			Console.WriteLine( "Matches remaining: {0} start at: {1}", matches_remaining, demo ? "*" : start_at_match_id);
+			Console.WriteLine( "Matches remaining: {0} start at: {1}", matches_remaining, demo ? 0 : start_at_match_id);
 			var matches_requested = Math.Min(20, matches_remaining);
 			matches_remaining -= matches_requested;
 
