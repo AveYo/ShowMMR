@@ -171,7 +171,7 @@ class Program
 		Console.WriteLine();
 		Console.WriteLine( "Open Steam > Library > Dota2 > right-click Properties > Installed files > Browse..");
 		Console.WriteLine( "And replace game/dota/cfg/user_keys_{0}_slot3.vcfg with the generated file!", account_id.ToString());
-		Console.ReadKey();
+		//Console.ReadKey();
 	}
 
 	static async void OnConnected( SteamClient.ConnectedCallback callback )

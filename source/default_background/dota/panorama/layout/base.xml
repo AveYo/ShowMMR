@@ -3,7 +3,7 @@
 		<include src="s2r://panorama/styles/base.vcss_c" />
 	</styles>
 
-	<!--	ShowMMR dashboard mod by AveYo, 2023.08.19	-->
+	<!--	ShowMMR dashboard mod by AveYo, 2023.08.22	-->
 	<scripts>
 		<include src="s2r://panorama/scripts/sequence_actions.vts_c" />
 	</scripts>
@@ -51,8 +51,9 @@
 
 			/// MMR Number - must load the HeroStatsPage once to grab it
 			let stats = core; let retries = 100; // let nav = true; /// change: always nav once to force a refresh
-			RunSingleAction(new DispatchEventAction('DOTAShowProfileHeroStatsPage', core));
 			let queue = new RunSequentialActions();
+			queue.actions.push( new DispatchEventAction('DOTAEnsureRecentGamesLoaded', false) );
+			queue.actions.push( new DispatchEventAction('DOTAShowProfileHeroStatsPage', core) );
 			queue.actions.push( new WaitForConditionAction( function() {
 				let pages = core.FindChild('DashboardForeground').FindChild('DashboardPages');
 				for ( let i = 0; i < pages.GetChildCount(); ++i ) {
@@ -88,7 +89,8 @@
 				core.Data.cfg = {};
 
 			core.Data.cfg.RankUpdated = true;
-			//ShowMMR_Refresh();
+			if (core.Data.mmr !== null && core.Data.mmr < 1)
+				ShowMMR_Init(1, 3); //ShowMMR_Refresh();
 		}
 
 		function ShowMMR_RecentDataUpdated(t, k, v) {
@@ -97,6 +99,9 @@
 
 		$.RegisterForUnhandledEvent('DOTAGameUIStateChanged', ShowMMR_Init)
 		$.RegisterForUnhandledEvent('DOTARankUpdated', ShowMMR_DOTARankUpdated);
+		$.RegisterForUnhandledEvent('DOTAGameAccountClientUpdated', ShowMMR_DOTARankUpdated);
+		$.RegisterForUnhandledEvent('DOTALastMatchUpdated', ShowMMR_DOTARankUpdated);
+		$.RegisterForUnhandledEvent('DOTAMatchSignOutCompleted', ShowMMR_DOTARankUpdated);
 		CustomNetTables.SubscribeNetTableListener('ShowMMR_update', ShowMMR_RecentDataUpdated);
 	]]></script>
 

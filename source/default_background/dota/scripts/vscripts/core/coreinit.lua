@@ -1,4 +1,4 @@
---	ShowMMR dashboard mod by AveYo, 2023.07.23	--
+--	ShowMMR dashboard mod by AveYo, 2023.08.22	--
 
 if not IsServer() then return end -- local lua server instance only
 
@@ -86,7 +86,7 @@ function ShowMMR:Save(e)
 	local rank_1 = self.mmr or 0
 	local serialize = false
 
-    -- add mmr and change numbers for the 1st recent game if applicable
+	-- add mmr and change numbers for the 1st recent game if applicable
 	if time_1 ~= nil and rank_1 > 0 and (find_1 == nil or find_1[1] == 0 or find_1[2] == 0) then
 		local change, t = 0, tonumber(time_1)
 		if find_2 ~= nil and find_2[1] > 0 then change = rank_1 - find_2[1] end
@@ -105,12 +105,26 @@ function ShowMMR:Save(e)
 		serialize = true
 	end
 
+	-- discovered recent_game_time_x can be unreliable causing the (0) changes
+	local fixup = -1
+	ordered = {}; for n in pairs(self.data) do table.insert(ordered, n) end
+	table.sort(ordered, function(a,b) return a > b end)
+	for _, v in ipairs(ordered) do
+		local v1, v2 = self.data[v][1], self.data[v][2]
+		if fixup == -1 and v1 ~= 0 and v2 == 0 then fixup = v print('fixup') end
+		if fixup ~= -1 and v1 ~= 0 and v1 ~= self.data[fixup][1] then
+			self.data[fixup][2] = self.data[fixup][1] - v1
+			print('ShowMMR recent_game_time_x:', fixup, self.data[fixup][1], self.data[fixup][2])
+			CustomNetTables:SetTableValue('ShowMMR_update', ' ' .. fixup, {self.data[fixup][1], self.data[fixup][2]})
+			fixup = -1
+			serialize = true
+		end
+	end
+
 	-- serialize local mmr data to JOY1-JOY32 binds in cfg/user_keys_[userid]_slot3.vcfg
 	if serialize == true then
 		if table.nkeys == nil then require 'table.nkeys' end
 		local remain, limit, pages, line, text = table.nkeys(self.data), table.nkeys(self.bind), 1, 0, ''
-		ordered = {}; for n in pairs(self.data) do table.insert(ordered, n) end
-		table.sort(ordered, function(a,b) return a > b end)
 		for _, v in ipairs(ordered) do
 			line = line + 1; text = text .. ',' .. v .. ':[' .. self.data[v][1] .. ',' .. self.data[v][2] .. ']'
 			if line == remain or line == math.min(20, remain) then
