@@ -1,11 +1,14 @@
-/* 2>nul || @title DOTA MOD BUILDER by AveYo v9.1
+/* 2>nul || @title DOTA MOD BUILDER by AveYo v10
 
 @set "OVERRIDE_STEAM_PATH_IF_NEEDED="
 @set "OVERRIDE_DOTA2_PATH_IF_NEEDED="
 
+:: can rename this script, ex: "dota_mod_builder 3.bat" to output pak03_dir.vpk instead of default pak01_dir.vpk
 @call :init
 set "SOURCE=%~dp0dota"
 set "RELEASE=%~dp0release"
+set "FILE=pak01_dir"
+for %%i in (%~n0) do if %%i gtr 0 if %%i lss 10 set "FILE=pak0%%i_dir"
 if not exist "%SOURCE%\*" set "SOURCE=" & echo Select SOURCE folder:
 set "f=[void][System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');"
 set "b=$FB=New-Object System.Windows.Forms.FolderBrowserDialog -Property @{ SelectedPath = '%~dp0' };"
@@ -16,6 +19,7 @@ if /i "%SOURCE%"=="%~dp0" %<%:cf " No SOURCE folder selected! "%>% & pause & exi
 echo; & %<%:70 " Setup paths "%>%
 echo  SOURCE  = %SOURCE%
 echo  RELEASE = %RELEASE%
+echo  FILE    = %FILE%.vpk
 echo  DOTA2   = %DOTA2%
 
 echo Cleaning RELEASE folder
@@ -57,7 +61,7 @@ del /f/s/q *.png *.psd >nul 2>nul
 pushd "%~dp0"
 
 echo ValvePak-ing working folder to RELEASE
-%vpkmod% -i "%RELEASE%\working" -o "%RELEASE%\game\dota_mods\pak01_dir.vpk"
+%vpkmod% -i "%RELEASE%\working" -r -o "%RELEASE%\game\dota_mods\%FILE%.vpk"
 
 echo Cleaning working folder
 (del /f/s/q "%RELEASE%\working\*.*" & rmdir /s/q "%RELEASE%\working") >nul 2>nul
@@ -66,7 +70,7 @@ echo Exporting gameinfo
 call :export gameinfo > "%RELEASE%\game\dota\gameinfo_branchspecific.gi"
 
 echo Exporting readme
-if exist "%SOURCE%\readme.txt" copy /y "%SOURCE%\readme.txt" "%RELEASE%\game\dota_mods\pak01_dir.txt"
+if exist "%SOURCE%\readme.txt" copy /y "%SOURCE%\readme.txt" "%RELEASE%\game\dota_mods\%FILE%.txt"
 call :export readme > "%RELEASE%\readme.txt"
 call :export readme
 
