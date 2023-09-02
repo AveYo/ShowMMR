@@ -13,4 +13,4 @@ dotnet build ShowMMR_net6.csproj -c Release --self-contained=false -p:TargetFram
 
 rmdir /s/q "obj" >nul 2>nul 
 
-choice /c EX1T
+timeout /t -1 
