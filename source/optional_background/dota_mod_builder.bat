@@ -1,4 +1,4 @@
-/* 2>nul || @title DOTA MOD BUILDER by AveYo v10d
+/* 2>nul || @title DOTA MOD BUILDER by AveYo v10e
 
 @set "OVERRIDE_STEAM_PATH_IF_NEEDED="
 @set "OVERRIDE_DOTA2_PATH_IF_NEEDED="
@@ -8,6 +8,8 @@
 set "SOURCE=%~dp0dota"
 set "RELEASE=%~dp0release"
 set "FILE=pak01_dir"
+set "BG_SRC=%~dp0background.png"
+set "BG_DST=panorama/images/dashboard_background_custom.png"
 for %%i in (%~n0) do if %%i gtr 0 if %%i lss 10 set "FILE=pak0%%i_dir"
 if not exist "%SOURCE%\*" set "SOURCE=" & echo Select SOURCE folder:
 set "f=[void][System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');"
@@ -21,6 +23,8 @@ echo  SOURCE  = %SOURCE%
 echo  RELEASE = %RELEASE%
 echo  FILE    = %FILE%.vpk
 echo  DOTA2   = %DOTA2%
+echo  BG_SRC  = %BG_SRC%
+echo  BG_DST  = %BG_DST%
 
 echo Cleaning RELEASE folder
 (del /f/s/q "%RELEASE%\*.*" & rmdir /s/q "%RELEASE%") >nul 2>nul
@@ -28,6 +32,12 @@ echo Cleaning RELEASE folder
 
 echo Retrieving SOURCE files
 xcopy "%SOURCE%\*.*" "%RELEASE%\working" /E/C/I/Q/H/R/K/Y/Z >nul 2>nul
+
+:: this builder version will use a background.png if present in the same folder
+if not exist "%BG_SRC%" %<%:0e "WARNING: BG_SRC not present"%>% & echo;
+if exist "%BG_SRC%" for %%I in ("%RELEASE%\working\%BG_DST:/=\%") do (
+  mkdir "%%~dpI" >nul 2>nul & copy /y "%BG_SRC%" "%%~fI" >nul 2>nul & call :export background > "%%~dpnI.vtex"
+)
 
 if not exist %resourcecompiler% (
   %<%:60 " WARNING "%>>%  &  echo; resourcecompiler.exe not found! Install Dota 2 Workshop Tools if source needs compiling
@@ -132,11 +142,62 @@ if "!var!" neq "!txt!" (if "!txt!" equ "" (echo() else call echo(!var!) else ech
   To remake the mod from source:
   - need Dota2 Workshop Tools DLC for resourcecompile xml source files
   - run dota_mod_builder.bat, auto-compiled vpkmod will create the release vpk archive
+  - this builder version will use a background.png if present in the same folder
 
   To explore release/game/dota_mods/pak01_dir.vpk and compiled *_c content:
   - use VRF tool by SteamDatabase: github.com/SteamDatabase/ValveResourceFormat/
 
 :readme:]
+
+:: this builder version can use a custom image if a background.png is present the same folder
+:background:[
+<!-- dmx encoding keyvalues2_noids 1 format vtex 1 -->
+"CDmeVtex"
+{
+    "m_inputTextureArray" "element_array"
+    [
+        "CDmeInputTexture"
+        {
+            "m_name" "string" "0"
+            "m_fileName" "string" "[/]BG_DST[/]"
+            "m_colorSpace" "string" "srgb"
+            "m_typeString" "string" "2D"
+            "m_imageProcessorArray" "element_array"
+            [
+                "CDmeImageProcessor"
+                {
+                    "m_algorithm" "string" "None"
+                    "m_stringArg" "string" ""
+                    "m_vFloat4Arg" "vector4" "0 0 0 0"
+                }
+            ]
+        }
+    ]
+    "m_outputTypeString" "string" "2D"
+    "m_outputFormat" "string" "RGBA8888"
+    "m_outputClearColor" "vector4" "0 0 0 0"
+    "m_nOutputMinDimension" "int" "0"
+    "m_nOutputMaxDimension" "int" "0"
+    "m_textureOutputChannelArray" "element_array"
+    [
+        "CDmeTextureOutputChannel"
+        {
+            "m_inputTextureArray" "string_array" [ "0" ]
+            "m_srcChannels" "string" "rgba"
+            "m_dstChannels" "string" "rgba"
+            "m_mipAlgorithm" "CDmeImageProcessor"
+            {
+                "m_algorithm" "string" "None"
+                "m_stringArg" "string" ""
+                "m_vFloat4Arg" "vector4" "0 0 0 0"
+            }
+            "m_outputColorSpace" "string" "srgb"
+        }
+    ]
+    "m_vClamp" "vector3" "0 0 0"
+    "m_bNoLod" "bool" "1"
+}
+:background:]
 
 :: gameinfo_branchspecific.gi is used atm instead of launch option: -language mods
 :gameinfo:[

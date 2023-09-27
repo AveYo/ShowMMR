@@ -133,6 +133,7 @@ class Program
         if (Matches == null || account_id == 0)
         {
             Console.WriteLine("No results to display for {0}", account_id);
+            File.Delete(user + ".auth");
             //Console.ReadKey();
             System.Environment.Exit(1);
         }

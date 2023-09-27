@@ -1,0 +1,92 @@
+<root>
+	<styles>
+		<include src="s2r://panorama/styles/dotastyles.vcss_c" />
+		<include src="s2r://panorama/styles/dashboard_background_last_match.vcss_c" />
+		<include src="s2r://panorama/styles/dashboard_background_last_match_heroscale.vcss_c" />
+	</styles>
+
+	<!--	ShowMMR dashboard mod by AveYo, 2023.09.26	-->
+	<script><![CDATA[
+		'use strict';
+
+		function ShowMMR_Refresh_Last() {
+			let core = $.GetContextPanel().FindAncestor('DashboardCore');
+			if (core.Data.history == null) {
+				return;
+			}
+
+			if (core.Data.cfg.Refreshing_Last === true)
+				return; /// ignore other requests while running
+
+			core.Data.cfg.Refreshing_Last = true;
+
+			let cfg = core.Data.cfg, history = core.Data.history, show = core.Data.show, self = $.GetContextPanel();
+
+			let epoch = 0, stampdate = $.Localize('{T:s:timestamp}', self);
+			let stamp = 'E' + (stampdate + $.Localize('{T:t:timestamp}{T:d:duration}', self)).replace(/\D/g,'');
+			let found = show[stamp];
+
+			/// Match epoch - idk how to get unlocalized dialogvariabletime value, so derive 6 UTC dates and compare
+			if (!found) {
+				let gmt = $.Localize('{T:d:timestamp}', self), dst = $.Localize('{T:timestamp}', self), utc = [];
+				let hms = gmt.match(/\d+/g), hour = parseInt(hms[0]), minute = parseInt(hms[1]), second = parseInt(hms[2]);
+				if (hms.length < 3) {
+					second = minute; minute = hour; hour = 0;
+				}
+				let ymd = stampdate.match(/\d+/g), year = parseInt(ymd[0]), month = parseInt(ymd[1]), day = parseInt(ymd[2]);
+				if (year < 32) {
+					let flip = day; day = year; year = flip;
+				}
+				utc[0] = Date.UTC(year, month - 1, day, hour, minute, second, 0) / 1000; /// OK: day/month/year
+				utc[1] = Date.UTC(year, day - 1, month, hour, minute, second, 0) / 1000; /// US: month/day/year
+				utc[2] = utc[0] - 86400; utc[3] = utc[0] + 86400; utc[4] = utc[1] - 86400; utc[5] = utc[1] + 86400; /// +/- 1 day
+				utc.forEach(function(x,i,a){ self.SetDialogVariableTime('utc' + i, x); });
+				let localized = $.Localize('{T:utc0}|{T:utc1}|{T:utc2}|{T:utc3}|{T:utc4}|{T:utc5}', self).split('|');
+				localized.forEach(function(x,i,a){ if (x == dst) epoch = utc[i]; });
+			} else { epoch = found.epoch; }
+
+			if (!found) {
+				let e = history[epoch], mmr = e ? e[0] : -1, shift = e ? e[1] : -1;
+				show[stamp] = {label: '', epoch: epoch, mmr: mmr, shift: shift};
+				found = show[stamp];
+			}
+
+			let numbers;
+			if (!(found.mmr == -1 && found.shift == -1) && !(found.mmr == 0 && found.shift == 0)) {
+				numbers = ( (found.shift > 0) ? '+' : '') + found.shift;
+				$('#Win').text = numbers; $('#Loss').text = numbers;
+			}
+			core.Data.cfg.Refreshing_Last = false;
+		}
+
+		$.RegisterForUnhandledEvent('DOTABackgroundLastMatchUpdated', ShowMMR_Refresh_Last);
+	]]></script>
+
+	<DOTADashboardBackgroundLastMatch>
+		<Image id="custom" src="s2r://panorama/images/dashboard_background_custom.vtex" scaling="stretch-to-fit-preserve-aspect"/>
+		<DOTAScenePanel id="BackgroundScene" hittest="false" particleonly="true" require-composition-layer="true"/>
+		<Panel id="DetailsContainer">
+			<Label class="LastMatchTitle" text="#DOTA_Background_LastMatch_Title" />
+			<Label class="HeroName" text="{g:dota_hero_name:hero_id}" />
+			<Panel class="MatchInfo" onload="ShowMMR_Refresh_Last()">
+				<Label id="Win" class="MatchOutcome Green" text="#dota_profile_recent_game_result_win" />
+				<Label id="Loss" class="MatchOutcome Red" text="#dota_profile_recent_game_result_loss" />
+				<Label id="NotScored" class="MatchOutcome" text="#dota_profile_recent_game_result_notscored" />
+				<Label class="KDALabel" text="#DOTA_Background_LastMatch_KDA" />
+				<Label class="KDA" text="{i:kills} / {i:deaths} / {i:assists}" />
+			</Panel>
+			<Panel id="Items">
+				<DOTAItemImage id="Item0" class="ItemImage" />
+				<DOTAItemImage id="Item1" class="ItemImage" />
+				<DOTAItemImage id="Item2" class="ItemImage" />
+				<DOTAItemImage id="Item3" class="ItemImage" />
+				<DOTAItemImage id="Item4" class="ItemImage" />
+				<DOTAItemImage id="Item5" class="ItemImage" />
+			</Panel>
+			<TextButton id="ViewDetailsButton" text="#DOTA_Background_LastMatch_ViewMatch" onactivate="DOTAShowLastMatchDetails()" />
+		</Panel>
+		<Panel id="MissingDataContainer">
+			<Label class="MissingDataTitle" text="#DOTA_Background_LastMatch_WelcomeToDota" />
+		</Panel>
+	</DOTADashboardBackgroundLastMatch>
+</root>
