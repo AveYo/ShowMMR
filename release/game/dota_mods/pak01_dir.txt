@@ -1,7 +1,4 @@
-<p align="center">
-  <img src="preview.png" alt="ShowMMR DOTA dashboard mod"/>
 
-```
   ShowMMR, a DOTA dashboard mod to bring back the mmr numbers now that rank changes are variable
   ------------------------------------------------------------------------------------------------------
   Numbers are displayed like in the old client - the Nov 19 2017 one still works - example: 12345 (+45)
@@ -39,21 +36,4 @@
   Knowing Valve have historically disabled specific modding features rather than carpet banning users
   Nothing bad should happen if there is any official griefing regarding this harmless dashboard mod
   Still, use at your own risk!
-```
-```
-  To install the mod:
-  - open Steam > Library > Dota2 > right-click Properties > Installed files > Browse..
-  - copy release/game/ subfolder over there, overwriting existing files:
-  game/dota_mods/pak01_dir.vpk
-  game/dota/gameinfo_branchspecific.gi
-  - or skip gameinfo_branchspecific.gi and use instead launch option: -language mods
 
-  To remake the mod from source:
-  - need Dota2 Workshop Tools DLC for resourcecompile xml source files
-  - run dota_mod_builder.bat, auto-compiled vpkmod will create the release vpk archive
-
-  To explore release/game/dota_mods/pak01_dir.vpk and compiled *_c content:
-  - use VRF tool by SteamDatabase: github.com/SteamDatabase/ValveResourceFormat/
-
-```
-</p>

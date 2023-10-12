@@ -1,0 +1,113 @@
+<root>
+	<styles>
+		<include src="s2r://panorama/styles/dotastyles.vcss_c" />
+		<include src="s2r://panorama/styles/dashboard_background_last_match.vcss_c" />
+		<include src="s2r://panorama/styles/dashboard_background_last_match_heroscale.vcss_c" />
+	</styles>
+	<!--	ShowMMR dashboard mod by AveYo, 2023.10.11	-->
+	<script><![CDATA[
+		var ShowMMR_BackgroundLastMatchUpdated = function() {
+			'use strict';
+			let self = $.GetContextPanel(), core = self.FindAncestor("DashboardCore"), data = core.Data.ShowMMR;
+
+			if (data.history == null) {
+				return;
+			}
+
+			if (data.Refreshing_Last == true)
+				return; /// ignore other requests while running
+
+			data.Refreshing_Last = true;
+
+			/// show MMR change instead of Win / Lose label
+			let epoch = 0, stampdate = $.Localize('{T:s:timestamp}', self);
+			let stamp = 'E' + (stampdate + $.Localize('{T:t:timestamp}{T:d:duration}', self)).replace(/\D/g,'');
+			let found = data.show[stamp];
+
+			/// Match epoch - idk how to get unlocalized dialogvariabletime value, so derive 6 UTC dates and compare
+			if (!found) {
+				let gmt = $.Localize('{T:d:timestamp}', self), dst = $.Localize('{T:timestamp}', self), utc = [];
+				let hms = gmt.match(/\d+/g), hl = hms.length, ymd = stampdate.match(/\d+/g), yl = ymd.length;
+				let hour = hl>0 ? parseInt(hms[0]):0, minute = hl>1 ? parseInt(hms[1]):0, second = hl>2 ? parseInt(hms[2]):0;
+				if (hms.length < 3) {second = minute; minute = hour; hour = 0;}
+				let year = yl>0 ? parseInt(ymd[0]):0, month = yl>0 ? parseInt(ymd[1]):0, day = yl>0 ? parseInt(ymd[2]):0;
+				if (year < 32) {let flip = day; day = year; year = flip;}
+				utc[0] = Date.UTC(year, month - 1, day, hour, minute, second, 0) / 1000; /// OK: day/month/year
+				utc[1] = Date.UTC(year, day - 1, month, hour, minute, second, 0) / 1000; /// US: month/day/year
+				utc[2] = utc[0] - 86400; utc[3] = utc[0] + 86400; utc[4] = utc[1] - 86400; utc[5] = utc[1] + 86400; /// +/- 1 day
+				utc.forEach(function(x,i,a){ self.SetDialogVariableTime('utc' + i, x); });
+				let localized = $.Localize('{T:utc0}|{T:utc1}|{T:utc2}|{T:utc3}|{T:utc4}|{T:utc5}', self).split('|');
+				localized.forEach(function(x,i,a){ if (x == dst) epoch = utc[i]; });
+			} else { epoch = found.epoch; }
+
+			if (!found) {
+				let e = data.history[epoch], mmr = e ? e[0] : -1, shift = e ? e[1] : -1;
+				data.show[stamp] = {label: '', epoch: epoch, mmr: mmr, shift: shift};
+				found = data.show[stamp];
+			}
+
+			let numbers;
+			if (!(found.mmr == -1 && found.shift == -1) && !(found.mmr == 0 && found.shift == 0)) {
+				numbers = ( (found.shift > 0) ? '+' : '') + found.shift;
+				$('#Win').text = numbers; $('#Loss').text = numbers;
+			}
+			data.Refreshing_Last = false;
+		}
+
+		var ShowMMR_Background = function() {
+			$.GetContextPanel().RemoveAndDeleteChildren();
+			$.GetContextPanel().BLoadLayoutSnippet( Game.GetConvarBool('r_dashboard_render_quality') ? 'default' : 'mod' );
+			$('#DetailsContainer').BLoadLayoutSnippet("DetailsContainer");
+			$('#MissingDataContainer').BLoadLayoutSnippet("MissingDataContainer");
+		}
+
+		ShowMMR_Background(); /// use background.png mod when high quality dashboard is off
+		$.RegisterForUnhandledEvent('DOTABackgroundLastMatchUpdated', ShowMMR_BackgroundLastMatchUpdated);
+	]]></script>
+	<snippets>
+		<snippet name="mod">
+			<Panel>
+				<Image id="custom" src="file://{images}/background.png" scaling="stretch-to-fit-preserve-aspect" hittest="false" />
+				<DOTAScenePanel id="BackgroundScene" hittest="false" particleonly="true" />
+				<Panel id="DetailsContainer"/>
+				<Panel id="MissingDataContainer"/>
+			</Panel>
+		</snippet>
+		<snippet name="default">
+			<Panel>
+				<DOTAScenePanel id="BackgroundScene" map="scenes/dashboard_background/dashboard_background_last_match_radiant" camera="versus_camera" light="versus_light" deferredalpha="false" renderdeferred="true" particleonly="false"/>
+				<Panel id="BGVignette" hittest="false"/>
+				<Panel id="DetailsContainer"/>
+				<Panel id="MissingDataContainer"/>
+			</Panel>
+		</snippet>
+		<snippet name="DetailsContainer">
+			<Panel id="DetailsContainer">
+			<Label class="LastMatchTitle" text="#DOTA_Background_LastMatch_Title" />
+			<Label class="HeroName" text="{g:dota_hero_name:hero_id}" />
+				<Panel class="MatchInfo">
+				<Label id="Win" class="MatchOutcome Green" text="#dota_profile_recent_game_result_win" />
+				<Label id="Loss" class="MatchOutcome Red" text="#dota_profile_recent_game_result_loss" />
+				<Label id="NotScored" class="MatchOutcome" text="#dota_profile_recent_game_result_notscored" />
+				<Label class="KDALabel" text="#DOTA_Background_LastMatch_KDA" />
+				<Label class="KDA" text="{i:kills} / {i:deaths} / {i:assists}" />
+				</Panel>
+				<Panel id="Items">
+				<DOTAItemImage id="Item0" class="ItemImage" />
+				<DOTAItemImage id="Item1" class="ItemImage" />
+				<DOTAItemImage id="Item2" class="ItemImage" />
+				<DOTAItemImage id="Item3" class="ItemImage" />
+				<DOTAItemImage id="Item4" class="ItemImage" />
+				<DOTAItemImage id="Item5" class="ItemImage" />
+				</Panel>
+			<TextButton id="ViewDetailsButton" text="#DOTA_Background_LastMatch_ViewMatch" onactivate="DOTAShowLastMatchDetails()" />
+			</Panel>
+		</snippet>
+		<snippet name="MissingDataContainer">
+			<Panel id="MissingDataContainer">
+			<Label class="MissingDataTitle" text="#DOTA_Background_LastMatch_WelcomeToDota" />
+			</Panel>
+		</snippet>
+	</snippets>
+	<DOTADashboardBackgroundLastMatch onload="ShowMMR_Background();ShowMMR_BackgroundLastMatchUpdated();" />
+</root>

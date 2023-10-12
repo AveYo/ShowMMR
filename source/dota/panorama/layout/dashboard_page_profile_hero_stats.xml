@@ -1,0 +1,445 @@
+<root>
+	<styles>
+		<include src="s2r://panorama/styles/dotastyles.vcss_c" />
+		<include src="s2r://panorama/styles/dashboard_page_shared.vcss_c" />
+		<include src="s2r://panorama/styles/dashboard_page_profile.vcss_c" />
+		<include src="s2r://panorama/styles/dashboard_page_profile_hero_stats.vcss_c" />
+		<include src="s2r://panorama/styles/dashboard_page_profile_stats_shared.vcss_c" />
+	</styles>
+	<script><![CDATA[
+
+		/// ShowMMR dashboard mod by AveYo, 2023.10.11
+		var paginate = -1;
+
+		var ShowMMR_RecentGames = function() {
+			'use strict';
+			let recent = $('#RecentGamesTable');
+			let column = ['ResultColumn', 'TimestampDate', 'TimestampTime', 'DurationColumn', 'GameTypeColumn'], row = {};
+
+			/// RecentGamesTable updates 20 at a time; GetChildCount also includes header + spinner + loadmore
+			paginate++; if (paginate > 19) paginate = 0;
+			let count = recent.GetChildCount();
+
+			if (count < 3 || count < paginate)
+				return;
+
+			let core = $.GetContextPanel().FindAncestor("DashboardCore"), data = core.Data.ShowMMR;
+
+			if (data.history == null) {
+				$.Warning('ShowMMR_Refresh: missing data.history!');
+				return;
+			}
+
+			let entry = recent.GetChild(count - Math.min(count, 22) + paginate);
+			$.Each(column, function(c) { let r = entry.FindChildrenWithClassTraverse(c); row[c] = r ? r[0] : ''; } );
+
+			data._ranked = data._ranked || $.Localize('#dota_lobby_type_competitive');
+			if (row.GameTypeColumn == null || row.GameTypeColumn.text != data._ranked)
+				return; /// ranked only
+
+			let epoch = 0, stampdate = row.TimestampDate.text;
+			let stamp = 'E' + (stampdate + row.TimestampTime.text + row.DurationColumn.text).replace(/\D/g,'');
+			let found = data.show[stamp];
+
+			/// Match epoch - idk how to get unlocalized dialogvariabletime value, so derive 6 UTC dates and compare
+			if (!found) {
+				let gmt = $.Localize('{T:d:timestamp}', entry), dst = $.Localize('{T:timestamp}', entry), utc = [];
+				let hms = gmt.match(/\d+/g), hl = hms.length, ymd = stampdate.match(/\d+/g), yl = ymd.length;
+				let hour = hl>0 ? parseInt(hms[0]):0, minute = hl>1 ? parseInt(hms[1]):0, second = hl>2 ? parseInt(hms[2]):0;
+				if (hms.length < 3) {second = minute; minute = hour; hour = 0;}
+				let year = yl>0 ? parseInt(ymd[0]):0, month = yl>0 ? parseInt(ymd[1]):0, day = yl>0 ? parseInt(ymd[2]):0;
+				if (year < 32) {let flip = day; day = year; year = flip;}
+				utc[0] = Date.UTC(year, month - 1, day, hour, minute, second, 0) / 1000; /// OK: day/month/year
+				utc[1] = Date.UTC(year, day - 1, month, hour, minute, second, 0) / 1000; /// US: month/day/year
+				utc[2] = utc[0] - 86400; utc[3] = utc[0] + 86400; utc[4] = utc[1] - 86400; utc[5] = utc[1] + 86400; /// +/- 1 day
+				utc.forEach(function(x,i,a){ entry.SetDialogVariableTime('utc' + i, x); });
+				let localized = $.Localize('{T:utc0}|{T:utc1}|{T:utc2}|{T:utc3}|{T:utc4}|{T:utc5}', entry).split('|');
+				localized.forEach(function(x,i,a){ if (x == dst) epoch = utc[i]; });
+			} else { epoch = found.epoch; }
+
+			if (!found) {
+				let e = data.history[epoch], mmr = e ? e[0] : -1, shift = e ? e[1] : -1;
+				data.show[stamp] = {label: '', epoch: epoch, mmr: mmr, shift: shift};
+				found = data.show[stamp];
+			}
+
+			let numbers;
+			if (found.mmr == -1 && found.shift == -1) {
+				numbers = '';
+			} else if (found.mmr == 0 && found.shift == 0) {
+				data._uncalibrated = data._uncalibrated || $.Localize('#dota_profile_recent_game_result_uncalibrated_ranked');
+				numbers = data._uncalibrated;
+			} else if (entry.BHasClass('Abandoned')) {
+				data._abandon = data._abandon || $.Localize('#dota_profile_recent_game_result_abandon');
+				numbers = data._abandon + ' (' + found.shift + ')';
+			} else {
+				entry.SetDialogVariableInt('showmmr', found.mmr);
+				numbers = $.Localize('{i:showmmr}', entry) + ((found.shift > 0) ? ' (+' : ' (') + found.shift + ')';
+			}
+			if (numbers != '') { row.ResultColumn.text = numbers; found.label = numbers; }
+		}
+
+		var ShowMMR_Value = function() {
+			"use strict";
+			/// hide showcase background when dashboard quality is set to Low
+			let hq = Game.GetConvarBool('r_dashboard_render_quality');
+			$('#ShowcaseBackgroundContainer').style.visibility = hq ? 'visible' : 'collapse';
+
+			/// switch to hero tab when Refreshing else use matches history tab
+			let core = $.GetContextPanel().FindAncestor("DashboardCore"), data = core.Data.ShowMMR;
+			$.DispatchEvent('DOTAProfileHeroStatsTab', data.Refreshing ? 1 : 0);
+
+			if (!data.Refreshing)
+				return;
+
+			/// get MMR value - retry every 3 seconds, up to 8 times (valve made panorama refreshing of backend data very lazy)
+			data.mmr = -1;
+			$.GetContextPanel().style.visibility = 'collapse'; /// hide stats page to minimize flicker when reloading it
+			if ($.GetContextPanel().BHasClass('MMRCalibrated')) {
+				data.mmr = parseInt($.Localize('#ranked_mmr_value', $.GetContextPanel()).replaceAll(/\D+/g, '')) || -1;
+			}
+			$.Msg("#" + core.Data.ShowMMR.retries + " " + data.mmr);
+			if (data.mmr > -1 || --data.retries < 1) {
+				data.retries = -1;
+				$.GetContextPanel().style.visibility = 'visible';
+				$.DispatchEvent('DOTABackgroundLastMatchUpdated');
+				data.Refreshing = false;
+				$.DispatchEvent('DOTANavigateBack', $.GetContextPanel());
+				return;
+			}
+			$.Schedule(3.0, function() { $.DispatchEvent('DOTAReloadCurrentPage', $.GetContextPanel()); });
+		};
+
+
+		var AllHeroChallengeBannerClicked = function()
+		{
+		$( '#StatsContents' ).ToggleClass( 'ChildExpanded' );
+		$( '#AllHeroChallengeBanner' ).ToggleClass( 'Expanded' );
+		};
+
+		var SetRecentGamesOptionsVisible = function( bVisible ) {
+		$( '#RecentGamesOptionsContainer' ).SetHasClass( 'Active', bVisible );
+		$( '#RecentGamesOptionsButton' ).SetHasClass( 'Active', bVisible );
+		}
+
+		var ToggleRecentGamesOptions = function() {
+		SetRecentGamesOptionsVisible( !$( '#RecentGamesOptionsContainer' ).BHasClass( 'Active' ) );
+		};
+
+		var SetTab = function( nTabIndex ) {
+			if ( nTabIndex == 1 || nTabIndex == 2 ) {
+			SetRecentGamesOptionsVisible( false );
+			}
+			$.DispatchEvent( "DOTAProfileHeroStatsTab", nTabIndex );
+		}
+	]]></script>
+	<snippets>
+		<snippet name="RecentGame">
+			<Panel class="RecentGame" onload="ShowMMR_RecentGames()">
+				<Panel class="HeroNameRecentGamesColumn">
+					<DOTAHeroImage id="HeroIcon" heroimagestyle="landscape" scaling="stretch-to-fit-preserve-aspect" />
+					<Label class="HeroName" text="{s:hero_name}" />
+				</Panel>
+				<Label class="ResultColumn" text="{s:result}" />
+				<Panel class="TimestampColumn">
+					<Label class="TimestampDate" text="{T:s:timestamp}" />
+					<Label class="TimestampTime" text="{T:t:timestamp}" />
+				</Panel>
+				<Label class="DurationColumn" text="{T:d:duration}" />
+				<Label class="GameTypeColumn" text="{s:game_type}" />
+			</Panel>
+		</snippet>
+		<snippet name="RecentGameWeekendTourneyHeader">
+			<Panel class="RecentGameWeekendTourneyHeader">
+				<Label class="TourneyTitle" text="#dota_profile_recent_game_weekendtourney_header" />
+				<Label class="TourneyDivision" text="#dota_profile_recent_game_weekendtourney_division" />
+				<Label class="TourneyTier" text="#dota_profile_recent_game_weekendtourney_tier" />
+				<Button id="TourneyShowBracketButton">
+					<Label text="#dota_profile_recent_game_weekendtourney_showbracket" />
+				</Button>
+			</Panel>
+		</snippet>
+		<snippet name="TeammateStatsRow">
+			<Panel class="TeammateStatsRow">
+				<DOTAAvatarImage id="TeammateAvatarImage" />
+				<Label id="TeammatePersonaName" class="Teammate" text="{g:dota_persona:teammate_account_id}" html="true" />
+				<Label class="GamesCount" text="{d:teammate_games}" />
+				<Label class="WinsLosses" text="&lt;i&gt;{s:teammate_wins_minus_losses}&lt;/i&gt;" html="true" />
+				<Label class="WinRate" text="{s:teammate_win_rate}" />
+				<ProgressBar id="RatingProgressBar" min="0.0" max="1.0" value="0.7" />
+				<Label id="MostRecentMatchButton" class="MostRecentMatch" text="{T:s:teammate_recent_match_timestamp} {T:t:teammate_recent_match_timestamp}" />
+			</Panel>
+		</snippet>
+	</snippets>
+	<DOTAProfileHeroStatsPage class="DashboardPage" onload="ShowMMR_Value()">
+		<Panel id="ShowcaseBackgroundContainer" hittest="false">
+			<DOTAShowcaseBackground id="ShowcaseBackground" hittest="false" />
+		</Panel>
+		<Panel id="ProfileContainer" class="ProfileTopLevel">
+			<Panel id="Background" />
+			<Panel id="ProfileInteractable">
+				<Panel id="Header">
+					<Panel class="HeaderNameContainer LeftRightFlow">
+						<DOTARankBadge id="RankBadge" class="RankBadge SelfOnly" />
+						<DOTAAvatarImage id="AvatarImage" />
+						<Panel class="TopBottomFlow">
+							<Panel class="LeftRightFlow">
+								<DOTABattleCupVictoryIcon id="BattleCupVictoryIcon" class="BattleCupVictoryIconLarge" />
+								<DOTAUserName id="ProfileName" />
+								<DOTAUserName id="ProfileNickname" class="ProfileNickname" />
+							</Panel>
+							<DOTAUserRichPresence id="UserRichPresence" class="ProfileUserRichPresence" />
+						</Panel>
+					</Panel>
+					<Panel class="LeftRightFlow HorizontalCenter VerticalCenter">
+						<Panel class="TabGroupContainer">
+							<TabButton id="MatchHistoryTabButton" class="TabItem" group="stats_tabs" text="" onactivate="SetTab(0)">
+								<Label text="#DOTA_Profile_History_MatchHistoryTab" />
+							</TabButton>
+							<TabButton id="HeroStatsTabButton" class="TabItem SelfOnly" group="stats_tabs" selected="true" onactivate="SetTab(1)">
+								<Label text="#DOTA_Profile_History_HeroStatsTab" />
+							</TabButton>
+							<TabButton id="TeammatesTabButton" class="TabItem SelfOnly" group="stats_tabs" onactivate="SetTab(2)">
+								<Label text="#DOTA_Profile_History_TeammatesTab" />
+							</TabButton>
+						</Panel>
+					</Panel>
+					<Panel id="MMRContainer" class="TopBottomFlow SelfOnly">
+						<Panel class="MMRValueContainer TopBottomFlow">
+							<Panel class="MMRNumberContainer">
+								<Label id="MMRTBD" class="MMRTBD MMRValue" text="#ranked_mmr_tbd" />
+								<Label id="MMRNumber" class="MMRValue" text="#ranked_mmr_value" />
+								<Label id="MMRCalibrating" class="MMRValue" text="#ranked_mmr_calibrating" />
+								<Label id="MMRNoData" class="MMRValue" text="#ranked_mmr_core_no_data" />
+							</Panel>
+							<Label id="MMRLabel" text="#ranked_mmr_label" />
+						</Panel>
+						<Panel id="RankConfidenceContainer">
+							<Panel class="RankConfidenceProgressBarContainer TopBottomFlow">
+								<ProgressBar id="RankConfidenceProgressBar" onmouseover="UIShowTextTooltip( #ranked_mmr_confidence_tooltip )" onmouseout="UIHideTextTooltip()">
+									<Panel id="RankConfidenceCalibrationThreshold" />
+									<Label id="RankConfidenceProgressBarValue" text="#ranked_mmr_confidence_value" />
+								</ProgressBar>
+								<Label id="RankConfidenceProgressBarLabel" text="#ranked_mmr_confidence_label" />
+							</Panel>
+						</Panel>
+					</Panel>
+				</Panel>
+				<Panel id="StatsContents">
+					<Panel id="RecentGames">
+						<Panel class="HeroStatsHeaderRow">
+							<Label class="SimpleStatColumnHeader HeroNameRecentGamesColumn" text="#dota_profile_recent_game_header_hero_name" />
+							<Label class="SimpleStatColumnHeader ResultColumn" text="#dota_profile_recent_game_header_result" />
+							<Label class="SimpleStatColumnHeader TimestampColumn" text="#dota_profile_recent_game_header_timestamp" />
+							<Label class="SimpleStatColumnHeader DurationColumn" text="#dota_profile_recent_game_header_duration" />
+							<Label class="SimpleStatColumnHeader GameTypeColumn" text="#dota_profile_recent_game_header_type" />
+							<Button class="ControlIconButton SettingsButton" id="RecentGamesOptionsButton" onactivate="ToggleRecentGamesOptions();" />
+						</Panel>
+						<Panel class="LoadingSpinnerPanel">
+							<Panel class="Spinner" />
+						</Panel>
+						<Panel id="RecentGamesTable">
+							<Button id="LoadMore" class="ControlButton" onactivate="DOTAStatsEnsureRecentGamesLoaded( true )">
+								<Label text="#DOTA_WatchLive_Game_LoadMore" />
+							</Button>
+							<Label id="LoadingMore" text="#DOTA_LoadingPlayerLoading" />
+						</Panel>
+					</Panel>
+					<Panel id="RecentGamesOptionsContainer">
+						<DOTASettingsCheckbox class="SelfOnly" convar="cl_dota_recent_games_include_practice_matches" text="#dota_profile_recent_games_option_show_practice_matches" />
+						<DOTASettingsCheckbox convar="cl_dota_recent_games_include_custom_games" text="#dota_profile_recent_games_option_show_custom_games" />
+						<DOTASettingsCheckbox convar="cl_dota_recent_games_include_event_games" text="#dota_profile_recent_games_option_show_event_games" />
+					</Panel>
+					<Panel id="HeroStatsGrid">
+						<Panel class="HeroStatsHeaderRow">
+							<Panel class="SimpleStatColumnHeader HeroNameColumn">
+								<Label class="BlockName" text="#DOTA_HeroStatColumn_Header_Hero" />
+								<Panel class="HeaderNames">
+									<DOTASortHeader sortby="HeroName" text="#DOTA_HeroStatColumn_Hero" group="HeroStatsColumns" class="HeroNameColumn" />
+								</Panel>
+							</Panel>
+							<Panel class="SimpleStatColumnHeader GamesColumn">
+								<Label class="BlockName" text="#DOTA_HeroStatColumn_Header_Games" />
+								<Panel class="HeaderNames">
+									<Panel class="CenterWrapper">
+										<DOTASortHeader sortby="GamesPlayed" text="#DOTA_HeroStatColumn_GamesPlayed" group="HeroStatsColumns" defaultascending="false" />
+									</Panel>
+									<Panel class="CenterWrapper">
+										<DOTASortHeader sortby="Wins" text="#DOTA_HeroStatColumn_Wins" group="HeroStatsColumns" defaultascending="false" />
+									</Panel>
+									<Panel class="CenterWrapper">
+										<DOTASortHeader sortby="Losses" text="#DOTA_HeroStatColumn_Losses" group="HeroStatsColumns" />
+									</Panel>
+								</Panel>
+							</Panel>
+							<Panel class="SimpleStatColumnHeader RatingColumn">
+								<Label class="BlockName" text="#DOTA_HeroStatColumn_Header_Ratings" />
+								<Panel class="HeaderNames">
+									<Panel class="CenterWrapper">
+										<DOTASortHeader sortby="WinRate" text="#DOTA_HeroStatColumn_WinRate" group="HeroStatsColumns" class="RatingColumn" defaultascending="false" />
+									</Panel>
+									<Panel class="CenterWrapper">
+										<DOTASortHeader sortby="Rating" text="#DOTA_HeroStatColumn_Rating" group="HeroStatsColumns" class="RatingColumn ProgressBarColumn" defaultascending="false" />
+									</Panel>
+								</Panel>
+							</Panel>
+							<Panel class="SimpleStatColumnHeader WinStreakColumn">
+								<Label class="BlockName" text="#DOTA_HeroStatColumn_Header_WinStreaks" />
+								<Panel class="HeaderNames">
+									<Panel class="CenterWrapper">
+										<DOTASortHeader sortby="BestWinStreak" text="#DOTA_HeroStatColumn_BestWinStreak" group="HeroStatsColumns" defaultascending="false" />
+									</Panel>
+									<Panel class="CenterWrapper">
+										<DOTASortHeader sortby="CurrentWinStreak" text="#DOTA_HeroStatColumn_CurrentWinStreak" group="HeroStatsColumns" defaultascending="false" />
+									</Panel>
+								</Panel>
+							</Panel>
+							<Panel class="SimpleStatColumnHeader AveragesColumn">
+								<Label class="BlockName" text="#DOTA_HeroStatColumn_Header_Averages" />
+								<Panel class="HeaderNames">
+									<Panel class="CenterWrapper KDAValue">
+										<DOTASortHeader sortby="AvgKills" text="#DOTA_HeroStatColumn_AvgKills" group="HeroStatsColumns" defaultascending="false" />
+									</Panel>
+									<Panel class="CenterWrapper KDAValue">
+										<DOTASortHeader sortby="AvgDeaths" text="#DOTA_HeroStatColumn_AvgDeaths" group="HeroStatsColumns" defaultascending="false" />
+									</Panel>
+									<Panel class="CenterWrapper KDAValue">
+										<DOTASortHeader sortby="AvgAssists" text="#DOTA_HeroStatColumn_AvgAssists" group="HeroStatsColumns" defaultascending="false" />
+									</Panel>
+									<Panel class="CenterWrapper">
+										<DOTASortHeader sortby="AvgGPM" text="#DOTA_HeroStatColumn_AvgGPM" group="HeroStatsColumns" defaultascending="false" />
+									</Panel>
+									<Panel class="CenterWrapper">
+										<DOTASortHeader sortby="AvgXPM" text="#DOTA_HeroStatColumn_AvgXPM" group="HeroStatsColumns" defaultascending="false" />
+									</Panel>
+								</Panel>
+							</Panel>
+							<Panel class="SimpleStatColumnHeader BestRecordsColumn">
+								<Label class="BlockName" text="#DOTA_HeroStatColumn_Header_BestRecords" />
+								<Panel class="HeaderNames">
+									<Panel class="CenterWrapper KDAValue">
+										<DOTASortHeader sortby="BestKills" text="#DOTA_HeroStatColumn_BestKills" group="HeroStatsColumns" defaultascending="false" />
+									</Panel>
+									<Panel class="CenterWrapper KDAValue">
+										<DOTASortHeader sortby="BestAssists" text="#DOTA_HeroStatColumn_BestAssists" group="HeroStatsColumns" defaultascending="false" />
+									</Panel>
+									<Panel class="CenterWrapper">
+										<DOTASortHeader sortby="BestGPM" text="#DOTA_HeroStatColumn_BestGPM" group="HeroStatsColumns" defaultascending="false" />
+									</Panel>
+									<Panel class="CenterWrapper">
+										<DOTASortHeader sortby="BestXPM" text="#DOTA_HeroStatColumn_BestXPM" group="HeroStatsColumns" defaultascending="false" />
+									</Panel>
+								</Panel>
+							</Panel>
+						</Panel>
+						<Panel id="HeroStatsRows" />
+					</Panel>
+					<Panel id="TeammateStats">
+						<Panel class="TeammateStatsHeader">
+							<DOTASortHeader class="Teammate" sortby="PersonaName" text="#dota_profile_teammate_stats_header_teammate" group="TeammateStatsColumns" />
+							<DOTASortHeader class="GamesCount" sortby="GamesCount" text="#dota_profile_teammate_stats_header_games" group="TeammateStatsColumns" />
+							<DOTASortHeader class="WinsLosses" sortby="WinsLosses" text="#dota_profile_teammate_stats_header_wins_losses" group="TeammateStatsColumns" />
+							<DOTASortHeader class="WinRate" sortby="WinRate" text="#dota_profile_teammate_stats_header_win_rate" group="TeammateStatsColumns" />
+							<DOTASortHeader class="Rating" sortby="Rating" text="#dota_profile_teammate_stats_header_rating" group="TeammateStatsColumns" />
+							<DOTASortHeader class="MostRecentMatch" sortby="MostRecentMatch" text="#dota_profile_teammate_stats_header_most_recent_match" group="TeammateStatsColumns" />
+						</Panel>
+						<Panel class="LoadingSpinnerPanel">
+							<Panel class="Spinner" />
+						</Panel>
+						<Panel id="TeammateStatsTable" />
+					</Panel>
+				</Panel>
+				<Panel id="AllHeroChallengeBanner" onactivate="AllHeroChallengeBannerClicked()">
+					<Label id="AllHeroHeader" class="ProfileBoxHeader" text="#dota_profile_content_tab_all_hero_challenge" />
+					<Panel id="AllHeroChallenge">
+						<Panel class="ACExpander" />
+						<Panel id="AHCHeader">
+							<DOTAHeroMovie id="AHCCurrentHero" />
+							<Label class="BigHeroName" text="{g:dota_hero_name:current_hero_id}" />
+							<Panel id="AHCTopStats">
+								<Panel class="AHCStat">
+									<Label class="Left" text="#DOTA_AHC_InProgress" />
+									<Panel class="Middle" />
+									<Label class="Right" text="#DOTA_AHC_CurrentHeroAttempts" />
+								</Panel>
+								<Panel class="AHCStat">
+									<Label class="Left" text="#DOTA_AHC_CurrentHeroAverage" />
+									<Panel class="Middle" />
+									<Label class="Right" text="#DOTA_AHC_CurrentHeroAverageAttempts" />
+								</Panel>
+								<Panel class="AHCStat">
+									<Label class="Left" text="#DOTA_AHC_NextHero" />
+									<Panel class="Middle" />
+									<Label class="Right" text="{g:dota_hero_name:next_hero_id}" />
+								</Panel>
+								<Panel class="ProgressStat AHCStat">
+									<Label class="SubHeader" text="#DOTA_AHC_ChallengeProgress" />
+									<Panel class="Middle" />
+									<Label class="Right" text="#DOTA_AHC_HeroesCompletedValue" />
+								</Panel>
+							</Panel>
+						</Panel>
+						<Panel id="AHCHeroGrid" />
+						<Panel id="AHCFooter">
+							<Panel id="AHCBottomStats">
+								<Label class="SubHeader" text="#DOTA_AHC_ChallengeProgress" />
+								<Panel class="AHCStat">
+									<Label class="Left" text="#DOTA_AHC_HeroesCompleted" />
+									<Panel class="Middle" />
+									<Label class="Right" text="#DOTA_AHC_HeroesCompletedValue" />
+								</Panel>
+								<Panel class="AHCStat">
+									<Label class="Left" text="#DOTA_AHC_TotalAttempts" />
+									<Panel class="Middle" />
+									<Label class="Right" text="#DOTA_AHC_TotalAttemptsValue" />
+								</Panel>
+								<Panel class="AHCStat">
+									<Label class="Left" text="#DOTA_AHC_EquivalentWorldAverage" />
+									<Panel class="Middle" />
+									<Label class="Right" text="#DOTA_AHC_EquivalentWorldAverageValue" />
+								</Panel>
+								<Panel class="AHCBottomBreak" />
+								<Label class="SubHeader" text="#DOTA_AHC_LifetimeStats" />
+								<Panel class="AHCStat">
+									<Label class="Left" text="#DOTA_AHC_FullChallengesCompleted" />
+									<Panel class="Middle" />
+									<Label class="Right" text="#DOTA_AHC_FullChallengesCompletedValue" />
+								</Panel>
+								<Panel class="AHCStat">
+									<Label class="Left" text="#DOTA_AHC_BestFullChallenge" />
+									<Panel class="Middle" />
+									<Label class="Right" id="AHCBestFullChallenge" text="#DOTA_AHC_BestFullChallengeValue" />
+								</Panel>
+								<Panel class="AHCStat">
+									<Label class="Left" text="#DOTA_AHC_FullChallengeAverage" />
+									<Panel class="Middle" />
+									<Label class="Right" text="#DOTA_AHC_FullChallengeAverageValue" />
+								</Panel>
+							</Panel>
+							<Panel id="AHCRewardFiller" />
+							<Panel id="AHCReward">
+								<Label class="SubHeader" text="#DOTA_AHC_ChallengeReward" />
+								<Label class="Dark" text="#DOTA_AHC_ChallengeTrophyName" />
+								<Label class="Dark" text="#DOTA_AHC_ChallengeTrophyLevel" />
+								<DOTATrophyImage id="AHCRewardTrophy" scaling="stretch-to-fit-preserve-aspect" />
+							</Panel>
+						</Panel>
+					</Panel>
+					<Panel class="MoreDetailsButton" onactivate="AllHeroChallengeBannerClicked()">
+						<Label class="Expand" text="+" />
+						<Label class="Collapse" text="-" />
+					</Panel>
+				</Panel>
+				<Panel id="DotaPlusStatsBanner">
+					<Panel id="PlusLogoContainer">
+						<DOTAScenePanel id="PlusLogoShadow" camera="shot_camera" map="scenes/plus_logo" renderdeferred="true" deferredalpha="true" antialias="true" hittest="false" particleonly="false" />
+						<DOTAScenePanel id="PlusLogo" camera="shot_camera" map="scenes/plus_logo" renderdeferred="true" deferredalpha="true" antialias="true" hittest="false" particleonly="false" />
+					</Panel>
+					<Label class="Title" text="#DOTA_AdvancedProfileStatsBanner_Title" />
+					<Label class="Description" text="#DOTA_AdvancedProfileStatsBanner_Description" />
+					<TextButton class="PopupButton Small VerticalCenter" text="Subscribe" onactivate="DOTAPlusSubscribe()" />
+				</Panel>
+			</Panel>
+		</Panel>
+	</DOTAProfileHeroStatsPage>
+</root>

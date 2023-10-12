@@ -1,0 +1,87 @@
+<root>
+	<styles>
+		<include src="s2r://panorama/styles/base.vcss_c" />
+	</styles>
+
+	<!--	ShowMMR dashboard mod by AveYo, 2023.10.11	-->
+	<scripts>
+		<include src="s2r://panorama/scripts/sequence_actions.vts_c" />
+	</scripts>
+	<script><![CDATA[
+		'use strict';
+		const page = $('#Dashboard').FindChildInLayoutFile('DashboardPages');
+		const back = $('#Dashboard').FindChildInLayoutFile('DashboardBackgroundManager');
+		const core = $('#Dashboard').FindChildInLayoutFile('DashboardCore'); core.Data.ShowMMR = {};
+		const data = core.Data.ShowMMR;
+
+		var ShowMMR_GameUIStateChanged = function(old_state, new_state) {
+			if (old_state !== 1 || new_state !== 3) {
+				//data.mmr = null;
+				return; /// Dashboard-only ( dota_game_ui_state_loading_screen 1 -> dota_game_ui_state_dashboard 3 )
+			}
+
+			ShowMMR_ReloadBackground();
+
+			if (data.show == null)
+				data.show = {};
+
+			if (data.history == null) {
+				$.Msg("> data.history IS NULL");
+				data.history = {};
+				let history = CustomNetTables.GetAllTableValues('ShowMMR_history');
+				for (var i = 0; i < history.length; ++i)
+				{
+					let kv = history[i]['value'];
+					if (kv == null)
+						continue;
+					for (let [k, v] of Object.entries(kv)) {data.history[parseInt(k)] = [v['1'], v['2']];}
+				}
+			}
+
+			if (data.mmr == null || data.mmr < 0 || data.RankUpdating == true) {
+				data.mmr = -1;
+				data.RankUpdating = false;
+				ShowMMR_Refresh();
+			}
+		}
+
+		var ShowMMR_Refresh = function() {
+			if (data.Refreshing)
+				return; /// ignore other requests while running
+
+			data.Refreshing = true;
+			data.retries = 8; /// retries to get the MMR on the stats page (it no longer update by itself timely)
+
+			$.DispatchEvent('DOTAShowLocalProfileHeroStatsPage');
+		}
+
+		var ShowMMR_RankUpdated = function() {
+			data.RankUpdating = true;
+			if (data.mmr !== null && data.mmr < 0)
+				ShowMMR_GameUIStateChanged(1, 3); //ShowMMR_Refresh();
+		}
+
+		var ShowMMR_TableUpdated = function(t, k, v) {
+			data.history[parseInt(k)] = [v['1'], v['2']];
+		}
+
+		var ShowMMR_ReloadBackground = function() {
+			let bg = Game.GetConvarBool('r_dashboard_render_quality') ? data.background : 'DOTADashboardBackgroundLastMatch';
+			back.SetAttributeString('override-background', bg != '' ? bg : null);
+			$.DispatchEvent('DOTAReloadCurrentPage', back);
+		}
+
+		data.background = back.GetAttributeString('override-background', '');
+		ShowMMR_ReloadBackground();
+
+		$.RegisterForUnhandledEvent('DOTAGameUIStateChanged',       ShowMMR_GameUIStateChanged)
+		$.RegisterForUnhandledEvent('DOTARankUpdated',              ShowMMR_RankUpdated);
+		$.RegisterForUnhandledEvent('DOTAGameAccountClientUpdated', ShowMMR_RankUpdated);
+		//$.RegisterForUnhandledEvent('DOTAClientSignOnStateUpdated', ShowMMR_RankUpdated);
+		CustomNetTables.SubscribeNetTableListener('ShowMMR_update', ShowMMR_TableUpdated);
+	]]></script>
+
+	<Panel class="WindowRoot" hittest="false">
+		<DOTADashboard id="Dashboard" />
+	</Panel>
+</root>
